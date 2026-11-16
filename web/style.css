@@ -59,7 +59,7 @@ button:hover { border-color: var(--signal); }
 button:disabled { opacity: .55; cursor: default; }
 .primary { color: #162016; background: var(--accent); border-color: #789859; }
 .field { display: grid; gap: .3rem; font-weight: 650; margin-block: .55rem; }
-input[type="search"], textarea, select { width: 100%; padding: .47rem .6rem; border: 1px solid var(--line); border-radius: 2px; color: var(--ink); background: var(--paper); min-width: 0; }
+input[type="search"], input[type="number"], textarea, select { width: 100%; padding: .47rem .6rem; border: 1px solid var(--line); border-radius: 2px; color: var(--ink); background: var(--paper); min-width: 0; }
 textarea { display: block; min-height: 10rem; resize: vertical; font: .87rem/1.55 var(--mono); scrollbar-color: var(--line) transparent; }
 .filter-row { margin: .65rem 0; }
 .grow { flex: 1 1 15rem; }
@@ -98,3 +98,5 @@ ol.path { list-style: none; counter-reset: hops; padding: 0; }
 .flow-button { max-width: 100%; text-align: left; overflow-wrap: anywhere; font: .78rem/1.35 var(--mono); }
 .flow-button[aria-pressed="true"] { border-color: var(--signal); color: var(--signal); }
 .timeline { width: 100%; height: 80px; display: block; border: 1px solid var(--line); background: var(--paper); }
+.tcp-report { margin-top: .8rem; border: 1px solid var(--line); background: var(--paper); padding: .65rem .8rem; }
+#time-status[data-state="error"] { color: var(--warning); }

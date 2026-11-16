@@ -38,3 +38,45 @@ export function captureSummary(packets) {
     totalBytes,
   };
 }
+
+const SYN = 2;
+const ACK = 16;
+const END = 5; // FIN or RST
+const nextSeq = (seq) => (seq + 1) >>> 0;
+
+export function firstHandshake(packets, key) {
+  let initial;
+  let reply;
+  let repeats = 0;
+  for (const packet of packets) {
+    if (!packet.tcp || flowKey(packet) !== key) continue;
+    const { flags, seq, ack } = packet.tcp;
+    if (flags & END) {
+      if (initial) break;
+      continue;
+    }
+    const origin = endpoint(packet.source, packet.sourcePort);
+    if ((flags & (SYN | ACK)) === SYN) {
+      if (!initial) initial = { packet, origin };
+      else if (origin === initial.origin && seq === initial.packet.tcp.seq) repeats++;
+      else break;
+      continue;
+    }
+    if (!initial) continue;
+    if ((flags & (SYN | ACK)) === (SYN | ACK) && origin !== initial.origin && ack === nextSeq(initial.packet.tcp.seq)) {
+      reply ??= packet;
+    }
+    if (reply && (flags & (SYN | ACK)) === ACK && origin === initial.origin &&
+        seq === nextSeq(initial.packet.tcp.seq) && ack === nextSeq(reply.tcp.seq)) {
+      return { syn: initial.packet, reply, ack: packet, repeats };
+    }
+  }
+  return initial ? { syn: initial.packet, reply, ack: undefined, repeats } : null;
+}
+
+export function packetInWindow(time, earliest, range) {
+  if (!range) return true;
+  if (time === null || earliest === null) return false;
+  const elapsed = Math.round((time - earliest) * 1000) / 1e6;
+  return elapsed >= range.start && elapsed <= range.end;
+}

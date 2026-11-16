@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readCapture } from '../web/capture.mjs';
 import { decodeFrame } from '../web/packet.mjs';
-import { captureSummary, endpoint, flowKey } from '../web/flows.mjs';
+import { captureSummary, endpoint, firstHandshake, flowKey, packetInWindow } from '../web/flows.mjs';
 import { sampleCapture, samplePackets } from '../web/sample.mjs';
 
 function pcapng(packet, little) {
@@ -40,9 +40,9 @@ function pcapng(packet, little) {
 test('decoded example has both DNS, both HTTP and one TLS record across all classic endian/timestamp variants', () => {
   for (const little of [true, false]) for (const nano of [true, false]) {
     const report = readCapture(sampleCapture({ little, nano }));
-    assert.equal(report.packets.length, 5);
-    assert.deepEqual(report.packets.map((packet) => packet.kind), ['DNS', 'DNS', 'HTTP', 'HTTP', 'TLS']);
-    assert.match(report.packets[4].detail, /TLS 1.3 offered · demo.example/);
+    assert.equal(report.packets.length, 8);
+    assert.deepEqual(report.packets.map((packet) => packet.kind), ['DNS', 'DNS', 'TCP', 'TCP', 'TCP', 'HTTP', 'HTTP', 'TLS']);
+    assert.match(report.packets[7].detail, /TLS 1.3 offered · demo.example/);
     assert.doesNotMatch(JSON.stringify(report), /ignored|example\?|Location|MOVED/);
     assert.equal(report.packets[0].time, 1735689600000.935);
     const summary = captureSummary(report.packets);
@@ -81,7 +81,22 @@ test('rejects arbitrary input and reports a truncated trailing record', () => {
   assert.throws(() => readCapture(new ArrayBuffer(20)), /Unknown capture format/);
   const sample = sampleCapture();
   const report = readCapture(sample.slice(0, -5));
-  assert.equal(report.packets.length, 4);
+  assert.equal(report.packets.length, 7);
   assert.equal(report.truncated, true);
   assert.match(report.notes[0], /incomplete final record/);
+});
+
+test('matches a conventional TCP handshake and keeps partial evidence separate', () => {
+  const { packets } = readCapture(sampleCapture());
+  const [, , syn, reply, ack] = packets;
+  const key = flowKey(syn);
+  const result = firstHandshake(packets, key);
+  assert.deepEqual(result, { syn, reply, ack, repeats: 0 });
+  assert.equal(result.ack.time - result.syn.time, 124);
+  const incorrect = { ...ack, tcp: { ...ack.tcp, ack: 842 } };
+  assert.deepEqual(firstHandshake([syn, syn, reply, incorrect], key), { syn, reply, ack: undefined, repeats: 1 });
+  assert.equal(firstHandshake([reply, ack], key), null);
+  assert.equal(packetInWindow(reply.time, packets[0].time, { start: 0.125, end: 0.186 }), true);
+  assert.equal(packetInWindow(ack.time, packets[0].time, { start: 0.125, end: 0.186 }), false);
+  assert.equal(packetInWindow(null, packets[0].time, { start: 0, end: 1 }), false);
 });

@@ -2,6 +2,7 @@ const DNS_TYPE = new Map([[1, 'A'], [2, 'NS'], [5, 'CNAME'], [12, 'PTR'], [15, '
 const HTTP_METHOD = /^(GET|HEAD|POST|PUT|DELETE|CONNECT|OPTIONS|TRACE|PATCH) [^\s]+ HTTP\/1\.[01]$/;
 const DECODER = new TextDecoder('utf-8');
 const U16 = (bytes, i) => bytes[i] * 256 + bytes[i + 1];
+const U32 = (bytes, i) => U16(bytes, i) * 65536 + U16(bytes, i + 2);
 
 function address4(bytes, offset) {
   return [...bytes.subarray(offset, offset + 4)].join('.');
@@ -192,6 +193,7 @@ export function decodeFrame(bytes, link) {
   const udpLength = isTcp ? Infinity : U16(bytes, start + 4);
   const end = !isTcp && udpLength ? Math.min(ip.end, start + udpLength) : ip.end;
   const transport = { ...base, sourcePort, destinationPort };
+  if (isTcp) transport.tcp = { flags: bytes[start + 13], seq: U32(bytes, start + 4), ack: U32(bytes, start + 8) };
   if (headerLength < (isTcp ? 20 : 8) || start + headerLength > end) return { ...transport, detail: 'Transport payload truncated' };
   const payload = bytes.subarray(start + headerLength, end);
   let hint;

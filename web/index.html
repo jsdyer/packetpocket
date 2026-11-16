@@ -24,11 +24,16 @@
 <p class="muted">Select a pair to filter the packet list in both directions. Protocol endpoint grouping uses recorded addresses and ports.</p>
 <div class="scroll"><table><thead><tr><th scope="col">Conversation</th><th scope="col">Packets</th><th scope="col">Wire bytes</th></tr></thead><tbody id="flows"></tbody></table></div>
 <div class="row pager"><button id="flow-prev" type="button">Previous</button><span id="flow-count" class="mono" role="status"></span><button id="flow-next" type="button">Next</button></div>
+<div class="tcp-report" id="tcp-report" hidden><h3>TCP handshake in this conversation</h3><p id="tcp-status" role="status"></p><ul id="tcp-steps"></ul><p class="muted">Looks for the first SYN and matching acknowledgments in the full capture. Repeated SYNs may include duplicate capture records.</p></div>
 </section>
 <section class="box" aria-labelledby="packets-title">
 <div class="row between"><h2 id="packets-title">Packet timeline</h2><button id="export" type="button">Download matching metadata JSON</button></div>
 <div class="row filter-row"><label class="field grow">Search packets and endpoints<input id="query" type="search" autocomplete="off" placeholder="DNS, demo.example, or 192.0.2.7"></label><label class="field mode">Protocol<select id="protocol"></select></label></div>
 <div class="row"><p id="selected-flow" class="mono"></p><button id="clear-flow" type="button" hidden>Clear conversation filter</button></div>
+<form id="time-window" novalidate>
+  <div class="row filter-row"><label class="field mode">Elapsed from (seconds)<input id="time-from" type="number" min="0" step="any" placeholder="Start"></label><label class="field mode">Elapsed to (seconds)<input id="time-to" type="number" min="0" step="any" placeholder="End"></label><div class="row"><button id="apply-time" type="submit">Apply time window</button><button id="clear-time" type="button" disabled>Clear time window</button></div></div>
+  <p id="time-status" class="muted" role="status"></p>
+</form>
 <canvas id="timeline" width="900" height="80" class="timeline" role="img" aria-label="Packet count by equal time intervals" aria-describedby="timeline-note"></canvas>
 <p id="timeline-note" class="muted"></p>
 <div class="scroll"><table><thead><tr><th scope="col">#</th><th scope="col">Elapsed</th><th scope="col">Source</th><th scope="col">Destination</th><th scope="col">Protocol</th><th scope="col">Observation</th><th scope="col">Captured</th></tr></thead><tbody id="packets"></tbody></table></div>

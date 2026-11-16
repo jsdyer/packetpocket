@@ -1,6 +1,6 @@
 import { $, announce, downloadJSON, el, installTheme, stat, table, tag, wireDrop } from './ui.mjs';
 import { MAX_CAPTURE } from './capture.mjs';
-import { captureSummary, endpoint, flowKey } from './flows.mjs';
+import { captureSummary, endpoint, firstHandshake, flowKey, packetInWindow } from './flows.mjs';
 import { sampleCapture } from './sample.mjs';
 
 const LIMIT = 30;
@@ -13,6 +13,7 @@ let summary;
 let selected = null;
 let page = 0;
 let flowPage = 0;
+let timeRange = null;
 
 function size(value) {
   if (value < 1024) return `${value} B`;
@@ -28,7 +29,9 @@ function visiblePackets() {
   const query = $('query').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const kind = $('protocol').value;
   return report.packets.filter((packet) => {
-    if ((selected && selected !== flowKey(packet)) || (kind && kind !== packet.kind)) return false;
+    if ((selected && selected !== flowKey(packet)) || (kind && kind !== packet.kind) ||
+        !packetInWindow(packet.time, summary.earliest, timeRange)) return false;
+    if (!query.length) return true;
     const string = [packet.protocol, packet.kind, packet.detail, endpoint(packet.source, packet.sourcePort),
       endpoint(packet.destination, packet.destinationPort)].filter(Boolean).join(' ').toLowerCase();
     return query.every((term) => string.includes(term));
@@ -68,6 +71,7 @@ function flows(focusKey = null) {
       page = 0;
       flows(flow.key);
       packets();
+      showHandshake();
     });
     return [button, formatter.format(flow.packets), size(flow.bytes)];
   }), 3, 'No IP addresses were available to group.');
@@ -91,10 +95,12 @@ function timeline(filtered) {
     return;
   }
   canvas.hidden = false;
-  const range = summary.latest - summary.earliest;
+  const start = timeRange ? summary.earliest + timeRange.start * 1000 : summary.earliest;
+  const end = timeRange ? summary.earliest + timeRange.end * 1000 : summary.latest;
+  const range = end - start;
   const buckets = Array.from({ length: 48 }, () => 0);
   for (const packet of timed) {
-    const bin = range ? Math.min(buckets.length - 1, Math.floor((packet.time - summary.earliest) / range * buckets.length)) : 0;
+    const bin = range ? Math.max(0, Math.min(buckets.length - 1, Math.floor((packet.time - start) / range * buckets.length))) : 0;
     buckets[bin]++;
   }
   context.fillStyle = getComputedStyle(canvas).getPropertyValue('--signal').trim();
@@ -106,7 +112,39 @@ function timeline(filtered) {
       context.fillRect(i * cell + 1, height - bar, Math.max(1, cell - 2), bar);
     }
   });
-  $('timeline-note').textContent = `${formatter.format(timed.length)} timestamped matches across the capture’s ${(range / 1000).toFixed(3)} s span. Peak bucket ${formatter.format(max)} packets.`;
+  $('timeline-note').textContent = `${formatter.format(timed.length)} timestamped matches across ${(range / 1000).toFixed(3)} s. Peak bucket ${formatter.format(max)} packets.`;
+}
+
+function showHandshake() {
+  $('tcp-report').hidden = !selected?.endsWith(' · TCP');
+  const steps = $('tcp-steps');
+  steps.replaceChildren();
+  if ($('tcp-report').hidden) return;
+  const found = firstHandshake(report.packets, selected);
+  if (!found) {
+    $('tcp-status').textContent = 'No initial SYN appears for these endpoints.';
+    return;
+  }
+  const { syn, reply, ack, repeats } = found;
+  let status = ack ? 'All three handshake packets observed.' : 'Only part of the handshake was observed.';
+  if (ack && syn.time !== null && ack.time !== null && ack.time >= syn.time) {
+    status += ` Observed SYN-to-ACK time ${(ack.time - syn.time).toFixed(3)} ms.`;
+  }
+  if (repeats) status += ` Repeated initial SYN records: ${formatter.format(repeats)}.`;
+  $('tcp-status').textContent = status;
+  for (const [name, packet] of [['SYN', syn], ['SYN-ACK', reply], ['ACK', ack]]) {
+    if (packet) steps.append(el('li', `Packet ${packet.index} · ${name} · ${elapsed(packet.time)}`));
+  }
+}
+
+function setTimeRange(range) {
+  timeRange = range;
+  page = 0;
+  $('clear-time').disabled = !range;
+  const status = $('time-status');
+  status.dataset.state = 'ready';
+  status.textContent = range ? `Showing ${range.start}–${range.end} seconds after the first timestamp.` : '';
+  packets();
 }
 
 function show(value) {
@@ -125,7 +163,11 @@ function show(value) {
   $('notes').hidden = !value.notes.length;
   $('report').hidden = false;
   flows();
-  packets();
+  $('time-from').value = '';
+  $('time-to').value = '';
+  for (const id of ['apply-time', 'time-from', 'time-to']) $(id).disabled = summary.earliest === null;
+  setTimeRange(null);
+  showHandshake();
   announce(value.truncated ? 'Partial capture analyzed. See the capture notes.' : 'Capture analyzed locally. Choose a conversation to inspect its packets.');
 }
 
@@ -182,14 +224,39 @@ $('sample').addEventListener('click', () => analyse(sampleCapture(), ++generatio
 $('clear').addEventListener('click', clear);
 $('query').addEventListener('input', () => { page = 0; packets(); });
 $('protocol').addEventListener('change', () => { page = 0; packets(); });
-$('clear-flow').addEventListener('click', () => { selected = null; page = 0; flows(); packets(); $('query').focus(); });
+$('clear-flow').addEventListener('click', () => { selected = null; page = 0; flows(); packets(); showHandshake(); $('query').focus(); });
+$('time-window').addEventListener('submit', (event) => {
+  event.preventDefault();
+  if (!report || summary.earliest === null) return;
+  const from = $('time-from');
+  const to = $('time-to');
+  const span = Math.round((summary.latest - summary.earliest) * 1000) / 1e6;
+  const start = from.value === '' ? 0 : from.valueAsNumber;
+  const end = to.value === '' ? span : to.valueAsNumber;
+  if (from.validity.badInput || to.validity.badInput || !Number.isFinite(start) || !Number.isFinite(end) || start < 0 || start > end) {
+    const status = $('time-status');
+    status.dataset.state = 'error';
+    status.textContent = 'Enter nonnegative seconds with the end at or after the start.';
+    return;
+  }
+  setTimeRange(from.value === '' && to.value === '' ? null : { start, end });
+});
+$('clear-time').addEventListener('click', () => {
+  $('time-from').value = '';
+  $('time-to').value = '';
+  setTimeRange(null);
+  $('time-from').focus();
+});
 $('prev').addEventListener('click', () => { page--; packets(); });
 $('next').addEventListener('click', () => { page++; packets(); });
 $('flow-prev').addEventListener('click', () => { flowPage--; flows(); });
 $('flow-next').addEventListener('click', () => { flowPage++; flows(); });
 $('theme').addEventListener('click', () => requestAnimationFrame(() => { if (report) timeline(visiblePackets()); }));
 $('export').addEventListener('click', () => {
-  if (report) downloadJSON({ format: report.format, notes: report.notes, packets: visiblePackets() }, 'packet-pocket-report.json');
+  if (report) {
+    const packets = visiblePackets().map(({ tcp, ...packet }) => packet);
+    downloadJSON({ format: report.format, notes: report.notes, packets, elapsedSeconds: timeRange }, 'packet-pocket-report.json');
+  }
 });
 wireDrop($('input'), $('file'), open);
 installTheme();
