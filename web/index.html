@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en-CA">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#17201c"><meta name="description" content="Inspect PCAP and PCAPNG exports locally. Explore endpoints, DNS, HTTP and visible TLS handshakes.">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; worker-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Packet Pocket · CoolCode</title><link rel="stylesheet" href="./style.css"><script type="module" src="./app.mjs"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to capture analyzer</a>
+<header class="mast"><div class="wrap"><a href="../">CoolCode.ca</a><button id="theme" type="button" aria-label="Dark mode" aria-pressed="false" hidden>◐</button></div></header>
+<section class="hero"><div class="wrap"><div><h1>Packet Pocket</h1><p>Follow conversations in a capture, from addresses and ports to DNS questions and observable handshakes.</p></div><aside><strong>Capture files stay in this tab</strong><p>The analyzer reads files you provide. Exports can include private addresses, hostnames, and timestamps.</p></aside></div></section>
+<main id="main" class="wrap">
+<section class="box" id="input" aria-labelledby="input-title"><h2 id="input-title">Open a capture</h2>
+<p class="muted">Drop or choose an uncompressed PCAP or PCAPNG file up to 24 MiB. The first 50,000 packet records can be inspected.</p>
+<div class="row actions"><button id="choose" type="button" class="primary">Open capture</button><input id="file" type="file" accept=".pcap,.cap,.pcapng,application/vnd.tcpdump.pcap" hidden><button id="sample" type="button">Try synthetic example</button><button id="clear" type="button">Clear</button></div>
+<p id="status" class="status" role="status" aria-live="polite">Open a capture or try the synthetic example.</p></section>
+<div id="report" hidden>
+<section class="box" aria-labelledby="capture-title"><h2 id="capture-title">Capture overview <span class="tag" id="format"></span></h2>
+<div id="stats" class="stats"></div><ul id="notes" hidden></ul>
+<p class="muted">Parsing covers Ethernet, raw IP and Linux cooked frames. Each packet is interpreted independently. Stream reassembly and encrypted content are outside this view.</p>
+</section>
+<section class="box" aria-labelledby="flows-title"><h2 id="flows-title">IP conversations</h2>
+<p class="muted">Select a pair to filter the packet list in both directions. Protocol endpoint grouping uses recorded addresses and ports.</p>
+<div class="scroll"><table><thead><tr><th scope="col">Conversation</th><th scope="col">Packets</th><th scope="col">Wire bytes</th></tr></thead><tbody id="flows"></tbody></table></div>
+<div class="row pager"><button id="flow-prev" type="button">Previous</button><span id="flow-count" class="mono" role="status"></span><button id="flow-next" type="button">Next</button></div>
+</section>
+<section class="box" aria-labelledby="packets-title">
+<div class="row between"><h2 id="packets-title">Packet timeline</h2><button id="export" type="button">Download matching metadata JSON</button></div>
+<div class="row filter-row"><label class="field grow">Search packets and endpoints<input id="query" type="search" autocomplete="off" placeholder="DNS, demo.example, or 192.0.2.7"></label><label class="field mode">Protocol<select id="protocol"></select></label></div>
+<div class="row"><p id="selected-flow" class="mono"></p><button id="clear-flow" type="button" hidden>Clear conversation filter</button></div>
+<canvas id="timeline" width="900" height="80" class="timeline" role="img" aria-label="Packet count by equal time intervals" aria-describedby="timeline-note"></canvas>
+<p id="timeline-note" class="muted"></p>
+<div class="scroll"><table><thead><tr><th scope="col">#</th><th scope="col">Elapsed</th><th scope="col">Source</th><th scope="col">Destination</th><th scope="col">Protocol</th><th scope="col">Observation</th><th scope="col">Captured</th></tr></thead><tbody id="packets"></tbody></table></div>
+<div class="row pager"><button id="prev" type="button">Previous</button><span id="record-count" class="mono" role="status"></span><button id="next" type="button">Next</button></div>
+<p class="muted">Detected HTTP displays methods, hosts, and status codes. TLS displays complete ClientHello or ServerHello records found within a segment. Private names may be encrypted or unavailable.</p>
+</section>
+</div><noscript>Enable JavaScript to parse capture files locally.</noscript></main>
+<footer class="footer"><div class="wrap"><a href="../trackerxray/">Open browser HARs in Tracker X-Ray</a><a href="https://www.iana.org/assignments/service-names-port-numbers">Service and port registry</a><a href="https://datatracker.ietf.org/doc/draft-ietf-opsawg-pcapng/">PCAPNG format</a><a href="https://github.com/jsdyer/packetpocket">Source code</a></div></footer>
+</body>
+</html>
