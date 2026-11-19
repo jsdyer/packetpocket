@@ -95,16 +95,19 @@ function pcapng(bytes, view) {
     } else if (type === 3 && size >= 16 && interfaces.length) {
       const length = view.getUint32(offset + 8, little);
       const start = offset + 12;
-      const captured = Math.min(length, interfaces[0].snaplen || length, end - 4 - start);
-      add(result, bytes.subarray(start, start + captured), interfaces[0].link, null, length);
-    } else if (type === 2) ignored++;
+      const captured = Math.min(length, interfaces[0].snaplen || length);
+      if (size === 16 + Math.ceil(captured / 4) * 4) {
+        add(result, bytes.subarray(start, start + captured), interfaces[0].link, null, length);
+      } else ignored++;
+    } else if (type === 1) break;
+    else if (type === 2 || type === 3 || type === 6) ignored++;
     offset = end;
   }
   if (offset < bytes.length) {
     result.truncated = true;
     result.notes.push(result.packets.length === MAX_PACKETS ? 'Packet count limit reached.' : 'Reading stopped at a malformed or incomplete block.');
   }
-  if (ignored) result.notes.push(`${ignored} packet blocks used an unavailable interface or an unsupported format.`);
+  if (ignored) result.notes.push(`${ignored} packet blocks were malformed, unsupported or referenced an unavailable interface.`);
   return result;
 }
 

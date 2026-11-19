@@ -151,3 +151,20 @@ test('direction totals name a missing reverse direction and preserve the overall
   assert.deepEqual(directionCounts(packets.slice(0,1),key).map(row=>row.records),[1,0]);
   assert.deepEqual(directionCounts([],key),[]);
 });
+
+test('distinguishes a valid empty PCAPNG from a malformed packet-only file', () => {
+  const encoded = pcapng(samplePackets()[0],true);
+  const empty = encoded.slice(0,56);
+  assert.equal(readCapture(empty).packets.length,0);
+  const short = new Uint8Array(56+12);
+  short.set(new Uint8Array(empty));
+  const view = new DataView(short.buffer);
+  view.setUint32(56,6,true); view.setUint32(60,12,true); view.setUint32(64,12,true);
+  assert.throws(() => readCapture(short.buffer), /No supported packet records/);
+  // A simple packet block declaring 80 original bytes, with neither a snap limit nor any frame bytes.
+  const invalid = new Uint8Array(56+16);
+  invalid.set(new Uint8Array(empty));
+  const simple = new DataView(invalid.buffer);
+  simple.setUint32(56,3,true); simple.setUint32(60,16,true); simple.setUint32(64,80,true); simple.setUint32(68,16,true);
+  assert.throws(() => readCapture(invalid.buffer), /No supported packet records/);
+});
