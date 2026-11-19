@@ -6,6 +6,10 @@
 Compare two captures by protocol share and traffic rate, then select a conversation in the first capture to see its two directions. Export a filtered aggregate report to share counts and relative time bins without addresses or hostnames.
 <!-- /coolcode:guide -->
 
+## Start with a published capture
+
+Download [Wireshark’s DNS capture](https://wiki.wireshark.org/uploads/__moin_import__/attachments/SampleCaptures/dns.cap) and choose **Open capture**. Its 38 DNS records report 3,706 wire bytes across 278.879 seconds. Select a conversation to compare the volumes sent in the two directions. The [Wireshark sample capture catalogue](https://wiki.wireshark.org/samplecaptures) describes this recording. Packet Pocket links to Wireshark’s hosted original.
+
 ## Compare captures
 
 The whole-file comparison shows packet records, reported wire bytes, captured bytes, snapshot-shortened records, missing timestamps, timestamp span, packets per second and wire bytes per second. For example, an increase from 10% to 25% DNS is a 15 percentage-point increase. Both packet counts appear beside their shares. Rates use only timestamped records divided by the time between each capture’s first and last timestamps. A missing or zero duration has no rate. A capture taken on another interface or with different recording filters can produce different totals.
