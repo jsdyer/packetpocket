@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readCapture } from '../web/capture.mjs';
 import { decodeFrame } from '../web/packet.mjs';
 import { captureSummary, endpoint, firstHandshake, flowKey, packetInWindow } from '../web/flows.mjs';
-import { sampleCapture, samplePackets } from '../web/sample.mjs';
+import { sampleCapture, samplePackets } from './fixtures/captures.mjs';
 
 function pcapng(packet, little) {
   const padded = (packet.length + 3) & ~3;
@@ -99,4 +99,55 @@ test('matches a conventional TCP handshake and keeps partial evidence separate',
   assert.equal(packetInWindow(reply.time, packets[0].time, { start: 0.125, end: 0.186 }), true);
   assert.equal(packetInWindow(ack.time, packets[0].time, { start: 0.125, end: 0.186 }), false);
   assert.equal(packetInWindow(null, packets[0].time, { start: 0, end: 1 }), false);
+});
+
+test('relative traffic bins include both ends, omit untimed packets and distinguish bytes from counts', async () => {
+  const {aggregate,timeBuckets} = await import('../web/traffic.mjs');
+  const packets = [
+    {time:2000,bytes:90,captured:90,kind:'TCP'},
+    {time:1000,bytes:10,captured:5,kind:'UDP'},
+    {time:null,bytes:200,captured:20,kind:'TCP'},
+  ];
+  const totals = aggregate(packets);
+  assert.deepEqual([totals.records, totals.wireBytes, totals.capturedBytes, totals.shortened], [3,300,115,2]);
+  assert.deepEqual([totals.missingTimestamps, totals.spanSeconds, totals.packetsPerSecond, totals.wireBytesPerSecond], [1,1,2,100]);
+  assert.deepEqual(timeBuckets(packets,1000,2000,2), [{packets:1,wireBytes:10},{packets:1,wireBytes:90}]);
+  assert.deepEqual(timeBuckets(packets,2000,2000), [{packets:1,wireBytes:90}]);
+  assert.deepEqual(timeBuckets(packets,null,null), []);
+});
+
+test('compares PCAP and PCAPNG protocol shares while preserving partial, empty and zero-time cases', async () => {
+  const {captureMetrics,protocolComparison} = await import('../web/traffic.mjs');
+  const example = sampleCapture(), first = captureMetrics(readCapture(example));
+  const second = captureMetrics(readCapture(pcapng(samplePackets()[0],false)));
+  assert.equal(second.packetsPerSecond, null);
+  assert.equal(second.shortened, 1);
+  assert.equal(captureMetrics(readCapture(example.slice(0,-1))).stoppedEarly, true);
+  const blank = captureMetrics(readCapture(example.slice(0,24)));
+  assert.deepEqual([blank.records,blank.spanSeconds,blank.wireBytesPerSecond],[0,null,null]);
+  assert.equal(protocolComparison(blank,second)[0].changePoints,null);
+  const dns = protocolComparison(first,second).find(row => row.kind==='DNS');
+  assert.deepEqual(dns, {kind:'DNS',primaryPackets:2,secondaryPackets:1,primaryPercent:25,secondaryPercent:100,changePoints:75});
+  const shareable = JSON.stringify({first,second,protocols:protocolComparison(first,second)});
+  assert.doesNotMatch(shareable,/192\.0\.2|demo\.example|1735689600|endpoint|sourcePort|source|destination|payload|detail|host/i);
+});
+
+test('reads PCAPNG simple blocks without inventing timestamps or rates', async () => {
+  const {captureMetrics} = await import('../web/traffic.mjs');
+  const frame = samplePackets()[0];
+  const idb = new Uint8Array(pcapng(frame,true),0,56);
+  const size = 16 + ((frame.length+3)&~3);
+  const buffer = new ArrayBuffer(idb.byteLength+size), b = new Uint8Array(buffer), v = new DataView(buffer);
+  b.set(idb); v.setUint32(56,3,true); v.setUint32(60,size,true); v.setUint32(64,frame.length,true); b.set(frame,68); v.setUint32(buffer.byteLength-4,size,true);
+  const metrics = captureMetrics(readCapture(buffer));
+  assert.deepEqual([metrics.records,metrics.timestamped,metrics.missingTimestamps,metrics.spanSeconds,metrics.packetsPerSecond],[1,0,1,null,null]);
+});
+
+test('direction totals name a missing reverse direction and preserve the overall packet count', async () => {
+  const {directionCounts} = await import('../web/flows.mjs');
+  const {packets} = readCapture(sampleCapture());
+  const key = flowKey(packets[0]);
+  assert.deepEqual(directionCounts(packets,key).map(row=>row.records),[1,1]);
+  assert.deepEqual(directionCounts(packets.slice(0,1),key).map(row=>row.records),[1,0]);
+  assert.deepEqual(directionCounts([],key),[]);
 });

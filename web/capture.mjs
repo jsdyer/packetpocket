@@ -117,6 +117,6 @@ export function readCapture(buffer) {
   const format = FORMATS.get(magic);
   const result = format ? pcap(bytes, view, format) : magic === 0x0a0d0d0a ? pcapng(bytes, view) : null;
   if (!result) throw new Error('Unknown capture format. Choose an uncompressed PCAP or PCAPNG file.');
-  if (!result.packets.length) throw new Error('No supported packet records were found.');
+  if (!result.packets.length && (result.truncated || result.notes.length)) throw new Error('No supported packet records were found before an incomplete or unsupported record.');
   return result;
 }

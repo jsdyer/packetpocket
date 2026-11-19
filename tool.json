@@ -1,0 +1,24 @@
+{
+  "id": "packetpocket",
+  "title": "Packet Pocket",
+  "description": "Compare capture traffic, inspect both directions of a conversation and export filtered packet or aggregate reports.",
+  "category": "security",
+  "tags": [
+    "pcap",
+    "pcapng",
+    "wireshark",
+    "dns",
+    "tcp",
+    "udp",
+    "forensics"
+  ],
+  "icon": "binary",
+  "url": "/packetpocket/",
+  "source": "https://github.com/jsdyer/packetpocket",
+  "hosting": "project",
+  "access": "browser",
+  "data_info": {
+    "mode": "local",
+    "detail": "Your browser reads local PCAP and PCAPNG files. A second capture supplies aggregate rates and protocol shares for comparison."
+  }
+}

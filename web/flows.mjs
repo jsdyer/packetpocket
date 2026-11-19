@@ -80,3 +80,21 @@ export function packetInWindow(time, earliest, range) {
   const elapsed = Math.round((time - earliest) * 1000) / 1e6;
   return elapsed >= range.start && elapsed <= range.end;
 }
+
+export function directionCounts(packets, key) {
+  const directions = new Map();
+  for (const packet of packets) {
+    if (flowKey(packet) !== key) continue;
+    const from = endpoint(packet.source, packet.sourcePort);
+    const to = endpoint(packet.destination, packet.destinationPort);
+    if (!directions.size) {
+      directions.set(from, {from, to, records:0, wireBytes:0, capturedBytes:0});
+      if (from !== to) directions.set(to, {from:to, to:from, records:0, wireBytes:0, capturedBytes:0});
+    }
+    const direction = directions.get(from);
+    direction.records++;
+    direction.wireBytes += packet.bytes;
+    direction.capturedBytes += packet.captured;
+  }
+  return [...directions.values()];
+}

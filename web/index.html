@@ -9,33 +9,48 @@
 <body>
 <a class="skip" href="#main">Skip to capture analyzer</a>
 <header class="mast"><div class="wrap"><a href="../">CoolCode.ca</a><button id="theme" type="button" aria-label="Dark mode" aria-pressed="false" hidden>◐</button></div></header>
-<section class="hero"><div class="wrap"><div><h1>Packet Pocket</h1><p>Follow conversations in a capture, from addresses and ports to DNS questions and observable handshakes.</p></div><aside><strong>Capture files stay in this tab</strong><p>The analyzer reads files you provide. Exports can include private addresses, hostnames, and timestamps.</p></aside></div></section>
+<section class="hero"><div class="wrap"><div><h1>Packet Pocket</h1><p>Compare two captures, follow a conversation and measure when its traffic changes.</p></div><aside><strong>Capture files stay in this tab</strong><p>The analyzer reads files you provide. Choose an aggregate report for sharing, or keep packet-level details for your own inspection.</p></aside></div></section>
 <main id="main" class="wrap">
 <section class="box" id="input" aria-labelledby="input-title"><h2 id="input-title">Open a capture</h2>
 <p class="muted">Drop or choose an uncompressed PCAP or PCAPNG file up to 24 MiB. The first 50,000 packet records can be inspected.</p>
-<div class="row actions"><button id="choose" type="button" class="primary">Open capture</button><input id="file" type="file" accept=".pcap,.cap,.pcapng,application/vnd.tcpdump.pcap" hidden><button id="sample" type="button">Try synthetic example</button><button id="clear" type="button">Clear</button></div>
-<p id="status" class="status" role="status" aria-live="polite">Open a capture or try the synthetic example.</p></section>
+<div class="row actions"><button id="choose" type="button" class="primary">Open capture</button><input id="file" type="file" accept=".pcap,.cap,.pcapng,application/vnd.tcpdump.pcap" hidden><button id="clear" type="button">Clear</button></div>
+<p id="status" class="status" role="status" aria-live="polite">Choose a file from your device to begin.</p></section>
 <div id="report" hidden>
 <section class="box" aria-labelledby="capture-title"><h2 id="capture-title">Capture overview <span class="tag" id="format"></span></h2>
+<p id="primary-name" class="mono"></p>
 <div id="stats" class="stats"></div><ul id="notes" hidden></ul>
 <p class="muted">Parsing covers Ethernet, raw IP and Linux cooked frames. Each packet is interpreted independently. Stream reassembly and encrypted content are outside this view.</p>
+</section>
+<section class="box" id="compare-input" aria-labelledby="compare-title">
+<h2 id="compare-title">Compare captures</h2>
+<p>Open a second capture to compare overall traffic and protocol shares with the first. The comparison uses every parsed record in each file.</p>
+<div class="row actions"><button id="choose-second" type="button">Open second capture</button><input id="second-file" type="file" accept=".pcap,.cap,.pcapng,application/vnd.tcpdump.pcap" hidden><button id="remove-second" type="button" hidden>Remove comparison</button></div>
+<p id="compare-status" class="status" role="status">You can also drop the second file here.</p>
+<div id="comparison" hidden><p id="compare-names" class="mono"></p><p id="compare-notes" class="muted"></p>
+<div class="scroll"><table><caption>Observed traffic</caption><thead><tr><th>Metric</th><th>First</th><th>Second</th><th>Second minus first</th></tr></thead><tbody id="compare-metrics"></tbody></table></div>
+<p class="muted">Rates use timestamped packets divided by the span from the earliest to the latest timestamp. A zero or unknown span has no rate.</p>
+<div class="scroll"><table><caption>Share of packet records by decoded protocol</caption><thead><tr><th>Protocol</th><th>First</th><th>Second</th><th>Change (percentage points)</th></tr></thead><tbody id="compare-protocols"></tbody></table></div>
+<button id="compare-export" type="button">Download aggregate comparison JSON</button></div>
 </section>
 <section class="box" aria-labelledby="flows-title"><h2 id="flows-title">IP conversations</h2>
 <p class="muted">Select a pair to filter the packet list in both directions. Protocol endpoint grouping uses recorded addresses and ports.</p>
 <div class="scroll"><table><thead><tr><th scope="col">Conversation</th><th scope="col">Packets</th><th scope="col">Wire bytes</th></tr></thead><tbody id="flows"></tbody></table></div>
 <div class="row pager"><button id="flow-prev" type="button">Previous</button><span id="flow-count" class="mono" role="status"></span><button id="flow-next" type="button">Next</button></div>
+<div id="direction-report" hidden><h3>Conversation by direction</h3><div class="scroll"><table><thead><tr><th>Direction</th><th>Packet records</th><th>Wire bytes</th><th>Captured bytes</th></tr></thead><tbody id="directions"></tbody></table></div><p class="muted">Totals use the whole first capture. Zero means no packets were observed in that direction.</p></div>
 <div class="tcp-report" id="tcp-report" hidden><h3>TCP handshake in this conversation</h3><p id="tcp-status" role="status"></p><ul id="tcp-steps"></ul><p class="muted">Looks for the first SYN and matching acknowledgments in the full capture. Repeated SYNs may include duplicate capture records.</p></div>
 </section>
 <section class="box" aria-labelledby="packets-title">
-<div class="row between"><h2 id="packets-title">Packet timeline</h2><button id="export" type="button">Download matching metadata JSON</button></div>
-<div class="row filter-row"><label class="field grow">Search packets and endpoints<input id="query" type="search" autocomplete="off" placeholder="DNS, demo.example, or 192.0.2.7"></label><label class="field mode">Protocol<select id="protocol"></select></label></div>
+<div class="row between"><h2 id="packets-title">Packet timeline</h2><div class="row"><button id="aggregate-export" type="button">Download aggregate summary</button><button id="export" type="button">Download packet metadata</button></div></div>
+<div class="row filter-row"><label class="field grow">Search packets and endpoints<input id="query" type="search" autocomplete="off" placeholder="Protocol, hostname or address"></label><label class="field mode">Protocol<select id="protocol"></select></label></div>
 <div class="row"><p id="selected-flow" class="mono"></p><button id="clear-flow" type="button" hidden>Clear conversation filter</button></div>
 <form id="time-window" novalidate>
   <div class="row filter-row"><label class="field mode">Elapsed from (seconds)<input id="time-from" type="number" min="0" step="any" placeholder="Start"></label><label class="field mode">Elapsed to (seconds)<input id="time-to" type="number" min="0" step="any" placeholder="End"></label><div class="row"><button id="apply-time" type="submit">Apply time window</button><button id="clear-time" type="button" disabled>Clear time window</button></div></div>
   <p id="time-status" class="muted" role="status"></p>
 </form>
+<label class="field mode">Timeline measure<select id="timeline-measure"><option value="packets">Packet count</option><option value="wireBytes">Reported wire bytes</option></select></label>
 <canvas id="timeline" width="900" height="80" class="timeline" role="img" aria-label="Packet count by equal time intervals" aria-describedby="timeline-note"></canvas>
 <p id="timeline-note" class="muted"></p>
+<p class="muted">The aggregate summary follows the filters above and exports counts, protocol totals and relative time bins. Packet metadata includes individual locations in time, addresses and observed names.</p>
 <div class="scroll"><table><thead><tr><th scope="col">#</th><th scope="col">Elapsed</th><th scope="col">Source</th><th scope="col">Destination</th><th scope="col">Protocol</th><th scope="col">Observation</th><th scope="col">Captured</th></tr></thead><tbody id="packets"></tbody></table></div>
 <div class="row pager"><button id="prev" type="button">Previous</button><span id="record-count" class="mono" role="status"></span><button id="next" type="button">Next</button></div>
 <p class="muted">Detected HTTP displays methods, hosts, and status codes. TLS displays complete ClientHello or ServerHello records found within a segment. Private names may be encrypted or unavailable.</p>
